@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { Icon } from 'react-native-elements';
 import Swiper from 'react-native-swiper';
-import { getData, setData } from '../lib/storageFunctions';
+import { Haptic } from 'expo';
+import { getData, setData, getLimit, setLimit } from '../lib/storageFunctions';
 
 const screenWidth = Dimensions.get('window').width;
 const mainColor = '#333333';
@@ -20,7 +21,8 @@ export default class HomeScreen extends React.Component {
         super(props);
 
         this.state = {
-            number: '0'
+            number: '0',
+            limit: '10000'
         }
 
         this.loader();
@@ -29,9 +31,12 @@ export default class HomeScreen extends React.Component {
     async loader() {
         let date = this.currentDate();
         let data = await getData(date);
+
+        let limit = await getLimit();
         
         this.setState({
             number: data === null ? '0' : data,
+            limit: limit === null ? '10000' : limit
         });
     }
 
@@ -43,11 +48,20 @@ export default class HomeScreen extends React.Component {
         return dateShort;
     }
 
-    undoPress() {
+    async undoPress() {
+        Haptic.selection();
+        let date = this.currentDate();
+        let data = {
+            date: date,
+            number: '0'
+        }
 
+        await setData(data);
+        this.loader();
     }
 
     addPress() {
+        Haptic.selection();
         AlertIOS.prompt(
             'Log Calories',
             'How many calories do you want to log?',
@@ -70,8 +84,28 @@ export default class HomeScreen extends React.Component {
         );
     }
 
-    settingsPress() {
-
+    limitPress () {
+        Haptic.selection();
+        AlertIOS.prompt(
+            'Set Limit',
+            'What do you want to set your limit at?',
+            [
+                {
+                    text: 'Cancel',
+                    onPress: () => {},
+                    style: 'cancel',
+                },
+                {
+                    text: 'Set',
+                    onPress: (number) => {
+                        this.updateLimit(number);
+                    }
+                },
+            ],
+            'plain-text',
+            '',
+            'numeric'
+        );
     }
 
     async updateData(number) {
@@ -86,11 +120,16 @@ export default class HomeScreen extends React.Component {
         this.loader();
     }
 
+    async updateLimit(limit) {
+        await setLimit(+limit > 10000 ? '10000' : limit);
+        this.loader();
+    }
+
     render() {
         return (
             <SafeAreaView style={styles.screenContainer}>
                 <View style={styles.infoContainer}>
-                    <Text style={styles.mainText} allowFontScaling={false}>{this.state.number}</Text>
+                    {+this.state.number > +this.state.limit ? <Text style={styles.mainTextRed} allowFontScaling={false}>{this.state.number}</Text> : <Text style={styles.mainText} allowFontScaling={false}>{this.state.number}</Text>}
                     <Text style={styles.subText} allowFontScaling={false}>calories today</Text>
                 </View>
 
@@ -103,7 +142,7 @@ export default class HomeScreen extends React.Component {
                 <View style={styles.barContainer}>
                     <Icon name='undo' type='font-awesome' size={35} onPress={this.undoPress.bind(this)} />
                     <Icon name='plus' type='font-awesome' size={35} color={highlightColor} reverse onPress={this.addPress.bind(this)} />
-                    <Icon name='cog' type='font-awesome' size={35} onPress={this.settingsPress.bind(this)} />
+                    <Icon name='flag' type='font-awesome' size={35} onPress={this.limitPress.bind(this)} />
                 </View>
             </SafeAreaView>
         );
@@ -147,6 +186,11 @@ const styles = StyleSheet.create({
         fontSize: 96,
         fontWeight: 'bold',
         color: mainColor,
+    },
+    mainTextRed: {
+        fontSize: 96,
+        fontWeight: 'bold',
+        color: '#f00',
     },
     subText: {
         fontSize: 28,
